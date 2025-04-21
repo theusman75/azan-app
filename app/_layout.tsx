@@ -62,7 +62,7 @@ export default function Layout() {
           screenOptions={{
             headerShown: true,
             headerStyle: {
-              backgroundColor: '#FFB300', // Header background color
+              backgroundColor: '#1e1e1e', // Header background color
             },
             headerTintColor: '#fff', // Header text color
             headerTitleStyle: {
