@@ -185,6 +185,11 @@ export default function AlarmScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        <View className="my-2 p-4 bg-black/50 rounded-lg">
+          <Text className="text-center text-zinc-300 text-2xl">
+            Place Add Here
+          </Text>
+        </View>
       </View>
     </ImageBackground>
   );

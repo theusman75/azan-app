@@ -47,6 +47,12 @@ export default function HomeScreen() {
             content:
               '“And whoever puts their trust in Allah, He will be enough for them.”\n— [Quran 65:3]',
           },
+          {
+            id: '4',
+            type: 'Add Name',
+            content:
+              'Place addvertisement here.\n\nThis is a placeholder for your ad content.',
+          },
         ];
 
         setContent(mockContent);
