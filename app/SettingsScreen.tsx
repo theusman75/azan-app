@@ -344,7 +344,7 @@ export default function SettingsScreen() {
       </View>
       {/* Push Notification Toggle */}
       <View className="flex-row justify-between items-center bg-white/10 p-4 rounded-2xl mb-4 border border-white/10">
-        <Text className="text-white text-base">Enable Push Notifications</Text>
+        <Text className="text-white text-base">Get Prayer Reminder</Text>
         <Switch
           value={pushNotificationsEnabled}
           onValueChange={handlePushNotificationsToggle}
