@@ -6,20 +6,23 @@ import {
   TouchableOpacity,
   ImageBackground,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import AlarmCards from './components/AlarmCards';
 import usePrayerTimes from './hooks/usePrayerTimes';
+import useLocation from './hooks/useLocation'; // ✅ Make sure this import is correct
 
 const { height } = Dimensions.get('window');
 
 export default function AlarmScreen() {
-  const { data: prayerTimes } = usePrayerTimes();
+  const { data: prayerTimes, isLoading, error, refetch } = usePrayerTimes();
+  const { error: locationError } = useLocation(); // ✅ Hook must be inside the component
   const [alarms, setAlarms] = useState<Record<string, boolean>>({});
 
-  // Load saved alarms from AsyncStorage when the component mounts
+  // Load saved alarms
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -28,14 +31,14 @@ export default function AlarmScreen() {
           setAlarms(JSON.parse(savedAlarms));
         }
       } catch (error) {
-        console.error('Failed to load settings:', error);
+        console.error('Failed to load alarms:', error);
       }
     };
 
     loadSettings();
   }, []);
 
-  // Save alarms to AsyncStorage whenever they change
+  // Save alarms on change
   useEffect(() => {
     const saveAlarms = async () => {
       try {
@@ -52,7 +55,6 @@ export default function AlarmScreen() {
   useEffect(() => {
     const requestPermissions = async () => {
       const { status } = await Notifications.requestPermissionsAsync();
-      console.log('Notification Permission Status:', status); // Debug log
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required',
@@ -64,87 +66,85 @@ export default function AlarmScreen() {
     requestPermissions();
   }, []);
 
-  if (!prayerTimes?.timings) {
-    return (
-      <View className="flex-1 bg-zinc-900 justify-center items-center">
-        <Text className="text-white">Loading prayer times...</Text>
-      </View>
-    );
-  }
-
+  // Save Alarms
   const handleSaveAlarms = async () => {
-    const hasEnabledAlarms = Object.values(alarms).some(
-      (isEnabled) => isEnabled
-    );
+    const hasEnabledAlarms = Object.values(alarms).some(Boolean);
 
-    if (hasEnabledAlarms) {
-      const selectedAzan =
-        (await AsyncStorage.getItem('selectedAzan')) || 'Adhan Makkah'; // Default to 'Adhan Makkah'
+    if (!hasEnabledAlarms) {
+      return Alert.alert(
+        'Set Alarm',
+        'Please set at least one alarm before saving.'
+      );
+    }
 
-      for (const [prayer, isEnabled] of Object.entries(alarms)) {
-        if (isEnabled) {
-          const time = prayerTimes.timings[prayer]; // Get prayer time
-          const [hour, minute] = time.split(':').map(Number); // Parse hour and minute
+    const selectedAzan =
+      (await AsyncStorage.getItem('selectedAzan')) || 'Adhan Makkah';
 
-          const now = new Date();
-          const alarmTime = new Date();
-          alarmTime.setHours(hour, minute, 0, 0);
+    for (const [prayer, isEnabled] of Object.entries(alarms)) {
+      if (!isEnabled) continue;
 
-          // If the alarm time is in the past, schedule it for the next day
-          if (alarmTime <= now) {
-            alarmTime.setDate(alarmTime.getDate() + 1);
-          }
+      const time = prayerTimes?.timings?.[prayer];
+      if (!time) continue;
 
-          // Map the selected Azan name to the corresponding file
-          const azanFileMap = {
-            'Adhan Makkah': 'azan1.mp3',
-            'Adhan Madinah': 'azan2.mp3',
-            'Adhan Egypt': 'azan3.mp3',
-            'Adhan Turkey': 'azan4.mp3',
-          };
+      const [hour, minute] = time.split(':').map(Number);
+      const now = new Date();
+      const alarmTime = new Date();
+      alarmTime.setHours(hour, minute, 0, 0);
 
-          const selectedSound = azanFileMap[selectedAzan] || 'azan1.mp3';
-
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: `${prayer} Alarm`,
-              body: `It's time for ${prayer}!`,
-              sound: selectedSound, // Use the selected sound
-            },
-            trigger: {
-              date: alarmTime,
-            },
-          });
-        }
+      if (alarmTime <= now) {
+        alarmTime.setDate(alarmTime.getDate() + 1);
       }
 
-      Alert.alert('Success', 'Alarms have been saved successfully!');
-    } else {
-      Alert.alert('Set Alarm', 'Please set at least one alarm before saving.');
-    }
-  };
+      const azanFileMap = {
+        'Adhan Makkah': 'azan1.mp3',
+        'Adhan Madinah': 'azan2.mp3',
+        'Adhan Egypt': 'azan3.mp3',
+        'Adhan Turkey': 'azan4.mp3',
+      };
 
-  const triggerTestNotification = async () => {
-    console.log('Triggering Test Notification'); // Debug log
-    try {
-      const selectedSound =
-        (await AsyncStorage.getItem('selectedAzan')) || 'azan1.mp3'; // Default to azan1.mp3
+      const selectedSound = azanFileMap[selectedAzan] || 'azan1.mp3';
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Test Alarm',
-          body: 'This is a test notification with Azan sound.',
-          sound: selectedSound, // Use the selected sound
+          title: `${prayer} Alarm`,
+          body: `It's time for ${prayer}!`,
+          sound: selectedSound,
         },
         trigger: {
-          seconds: 5, // Trigger after 5 seconds
+          date: alarmTime,
         },
       });
-      console.log('Notification Scheduled'); // Debug log
-    } catch (error) {
-      console.error('Error scheduling notification:', error); // Debug log
     }
+
+    Alert.alert('Success', 'Alarms have been saved successfully!');
   };
+
+  // Test notification
+  const triggerTestNotification = async () => {
+    const selectedSound =
+      (await AsyncStorage.getItem('selectedAzan')) || 'azan1.mp3';
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Test Alarm',
+        body: 'This is a test notification with Azan sound.',
+        sound: selectedSound,
+      },
+      trigger: {
+        seconds: 5,
+      },
+    });
+  };
+
+  // Loading UI
+  if (!prayerTimes?.timings && isLoading) {
+    return (
+      <View className="flex-1 bg-zinc-900 justify-center items-center">
+        <ActivityIndicator size="large" color="#fbbf24" />
+        <Text className="text-white mt-4">Loading prayer times...</Text>
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -158,11 +158,32 @@ export default function AlarmScreen() {
           Prayer Alarms
         </Text>
 
+        {/* Location error */}
+        {locationError && (
+          <View className="bg-red-500/40 p-2 rounded-lg mx-4 mb-2 mt-[-8px]">
+            <Text className="text-white text-center text-sm">
+              Location Error: {locationError}. Please enable location services.
+            </Text>
+          </View>
+        )}
+
+        {/* API error */}
+        {error && (
+          <View className="bg-red-500/60 p-2 rounded-lg mx-4 mb-4">
+            <Text className="text-white text-center text-sm">{error}</Text>
+            <TouchableOpacity onPress={refetch}>
+              <View className="mt-2 bg-white/10 py-2 px-4 rounded-md">
+                <Text className="text-white text-center">Retry</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <ScrollView className="flex-1">
           <AlarmCards
-            prayerTimes={prayerTimes.timings}
-            alarms={alarms} // Pass the saved alarms state
-            onAlarmsChange={setAlarms} // Pass a callback to update alarms state
+            prayerTimes={prayerTimes?.timings || {}}
+            alarms={alarms}
+            onAlarmsChange={setAlarms}
           />
 
           <View className="mt-8 px-4">
@@ -185,6 +206,7 @@ export default function AlarmScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
         <View className="my-2 p-4 bg-black/50 rounded-lg">
           <Text className="text-center text-zinc-300 text-2xl">
             Place Add Here
